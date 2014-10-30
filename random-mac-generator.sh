@@ -19,7 +19,7 @@ function generate_random_OUI () {
   # Make a list of all OUI (first 3 octets of all MAC addresses)
   if [ -r /usr/share/wireshark/manuf ]; then # if manuf was found we use it
     NO_OF_OUI=$( awk '/^[[:digit:]].:/{print$1}' /usr/share/wireshark/manuf | grep -v '\/36$' | wc -l )
-    let "NO_OF_OUI+=1" # Add one to NO_OUI to include also the last line as an aoption
+    let "NO_OF_OUI+=1" # Add one to NO_OUI to include also the last line as an option
     OUI=$(( $RANDOM%$NO_OF_OUI )) # MAX[$RANDOM] (32K) > $NO_OF_OUI (~16K) is confirmed
     RANDOM_OUI=$( awk '/^[[:digit:]].:/{print$1}' /usr/share/wireshark/manuf | grep -v '\/36$' | sed -n "${OUI}p" )
     MANUF=$( sed -n "${OUI}p" /usr/share/wireshark/manuf | awk '{print $2}')
