@@ -68,7 +68,7 @@ function generate_random_NIC () {
 
 function main () {
   get_mac $IFACE
-  if [ "$?" -ne 1 ]; then # A MAC address was for $IFACE was found
+  if [ "$?" -ne 1 ]; then # A MAC address for $IFACE was found
     generate_random_OUI
     generate_random_NIC
     NEW_MAC_ADDRESS="${RANDOM_OUI}:${OCTETA}:${OCTETB}:${OCTETC}"
