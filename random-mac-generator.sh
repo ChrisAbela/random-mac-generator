@@ -41,12 +41,13 @@ function get_mac() {
 function generate_random_OUI () {
   # You will need wireshark package for this file
   # Make a list of all OUI (first 3 octets of all MAC addresses)
-  if [ -r /usr/share/wireshark/manuf ]; then # if manuf was found we use it
-    NO_OF_OUI=$( awk '/^[[:digit:]].:/{print$1}' /usr/share/wireshark/manuf | grep -v '\/36$' | wc -l )
+  manuf=${manuf:-/usr/share/wireshark/manuf}
+  if [ -r $manuf ]; then # if manuf was found we use it
+    NO_OF_OUI=$( awk '/^[[:digit:]].:/{print$1}' $manuf | grep -v '\/36$' | wc -l )
     let "NO_OF_OUI+=1" # Add one to NO_OUI to include also the last line as an option
     OUI=$(( $RANDOM%$NO_OF_OUI )) # MAX[$RANDOM] (32K) > $NO_OF_OUI (~16K) is confirmed
-    RANDOM_OUI=$( awk '/^[[:digit:]].:/{print$1}' /usr/share/wireshark/manuf | grep -v '\/36$' | sed -n "${OUI}p" )
-    MANUF=$( sed -n "${OUI}p" /usr/share/wireshark/manuf | awk '{print $2}')
+    RANDOM_OUI=$( awk '/^[[:digit:]].:/{print$1}' $manuf | grep -v '\/36$' | sed -n "${OUI}p" )
+    MANUF=$( sed -n "${OUI}p" $manuf | awk '{print $2}')
   else # manuf was not found therefore we keep the same OUI
     RANDOM_OUI=$( echo "$MAC" | cut -d: -f1-3 )
     return 2 # OUI is not random
