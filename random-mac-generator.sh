@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2014, Chris Abela, Malta
+# Copyright (c) 2014, 2015, Chris Abela, Malta
 # All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -23,6 +23,8 @@
 # Usage: random-mac-generator.sh <interface-name(s)>
 # If no arguments are given the scipt will change the MAC address of all interface(s)
 # If you installed wireshark, this script will attempt to change also the OUI
+# by reading /usr/share/wireshark/manuf. You may pass an alternative MANUF variable
+# to this script.
 # This script must be called with root privileges
 
 function get_interface_list () {
@@ -39,16 +41,18 @@ function get_mac() {
 }
 
 function generate_random_OUI () {
-  # You will need wireshark package for this file
   # Make a list of all OUI (first 3 octets of all MAC addresses)
-  manuf=${manuf:-/usr/share/wireshark/manuf}
-  if [ -r $manuf ]; then # if manuf was found we use it
-    NO_OF_OUI=$( awk '/^[[:digit:]].:/{print$1}' $manuf | grep -v '\/36$' | wc -l )
+  MANUF=${MANUF:-/usr/share/wireshark/manuf} # Consider alternative MANUF if passed to this script
+  if [ -r $MANUF ]; then # if MANUF was found we use it
+    # Clean MANUF
+    NO_OF_OUI=$( grep '^[[:digit:]].:' $MANUF | grep -v "/36" | wc -l )
     let "NO_OF_OUI+=1" # Add one to NO_OUI to include also the last line as an option
     OUI=$(( $RANDOM%$NO_OF_OUI )) # MAX[$RANDOM] (32K) > $NO_OF_OUI (~16K) is confirmed
-    RANDOM_OUI=$( awk '/^[[:digit:]].:/{print$1}' $manuf | grep -v '\/36$' | sed -n "${OUI}p" )
-    MANUF=$( sed -n "${OUI}p" $manuf | awk '{print $2}')
-  else # manuf was not found therefore we keep the same OUI
+    # We compute this once:
+    CHOSEN_LINE=$( grep '^[[:digit:]].:' $MANUF | grep -v "/36" | sed -n "${OUI}p" )
+    RANDOM_OUI=$( echo $CHOSEN_LINE | awk '{print $1}' )
+    MANUFACTURER=$( echo $CHOSEN_LINE | awk '{print $2}' )
+  else # MANUF was not found therefore we keep the same OUI
     RANDOM_OUI=$( echo "$MAC" | cut -d: -f1-3 )
     return 2 # OUI is not random
   fi
@@ -65,24 +69,35 @@ function generate_random_NIC () {
   OCTETA=`echo "obase=16;$NICA" | bc`
   OCTETB=`echo "obase=16;$NICB" | bc`
   OCTETC=`echo "obase=16;$NICC" | bc`
+  # Ensure that all OCTET have at least 2 digits
+  [ $( echo $OCTETA | wc -c ) -eq 2 ] && OCTETA=0${OCTETA}
+  [ $( echo $OCTETB | wc -c ) -eq 2 ] && OCTETB=0${OCTETB}
+  [ $( echo $OCTETC | wc -c ) -eq 2 ] && OCTETC=0${OCTETC}
 }
 
 function main () {
+  LOG_FILE=${LOG_FILE:-/var/log/random-mac-generator.log}
   get_mac $IFACE
   if [ "$?" -ne 1 ]; then # A MAC address for $IFACE was found
     generate_random_OUI
     generate_random_NIC
     NEW_MAC_ADDRESS="${RANDOM_OUI}:${OCTETA}:${OCTETB}:${OCTETC}"
+    DATE=$( date | awk '{print $2,$3,$4}' )
+    touch $LOG_FILE
+    chmod 600 $LOG_FILE
+    echo "$DATE The original $IFACE MAC address was $MAC" | tee -a $LOG_FILE
+    echo "  Now is: $NEW_MAC_ADDRESS" | tee -a $LOG_FILE
+    [ -n "$MANUFACTURER" ] && echo "  Manufacturer: $MANUFACTURER" | tee -a $LOG_FILE
+    echo "  /sbin/ifconfig $IFACE hw ether $NEW_MAC_ADDRESS" | tee -a $LOG_FILE
     /sbin/ifconfig $IFACE down
-    /sbin/ifconfig $IFACE hw ether "$NEW_MAC_ADDRESS" && echo -n "The original $IFACE MAC address was $MAC and now is: $NEW_MAC_ADDRESS"
-    [ -n "$MANUF" ] && echo ", Manufacturer: $MANUF" || echo
+    /sbin/ifconfig $IFACE hw ether "$NEW_MAC_ADDRESS"
     /sbin/ifconfig $IFACE up
   fi
 }
 
 get_interface_list
 if [ $# == 0 ]; then
-  # No arguments have been entered, so I asume that you want all interfaces
+  # No arguments have been entered, so I assume that you want all interfaces
   for IFACE in $INTERFACES; do
     main 
   done
